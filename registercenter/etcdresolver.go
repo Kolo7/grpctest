@@ -2,6 +2,7 @@ package registercenter
 
 import (
 	"context"
+	"fmt"
 	"go.etcd.io/etcd/clientv3"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
@@ -43,8 +44,9 @@ func NewEtcdBuilder(address string) resolver.Builder {
 	return &etcdBuilder{address: address, client: client}
 }
 
-func (e etcdBuilder) resolve() ([]resolver.Address, string, error) {
-	res, err := e.client.Get(context.Background(), e.serviceName)
+func (e *etcdBuilder) resolve() ([]resolver.Address, string, error) {
+	withRange := clientv3.WithRange(fmt.Sprintf("%s%s", e.serviceName, "/end"))
+	res, err := e.client.Get(context.Background(), e.serviceName, withRange)
 	if err != nil {
 		return nil, "", err
 	}

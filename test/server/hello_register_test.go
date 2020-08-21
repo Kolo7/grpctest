@@ -24,7 +24,7 @@ func TestStartClient(t *testing.T) {
 			ServiceName:  "HelloService",
 			Host:         "127.0.0.1",
 			Port:         8090,
-			IntervalTime: time.Duration(10000),
+			IntervalTime: time.Duration(10),
 		})
 		if err != nil {
 			t.Errorf("failed to register: %v", err)
@@ -54,7 +54,7 @@ func TestStartClient2(t *testing.T) {
 			ServiceName:  "HelloService",
 			Host:         "127.0.0.1",
 			Port:         8091,
-			IntervalTime: time.Duration(10000),
+			IntervalTime: time.Duration(10),
 		})
 		if err != nil {
 			t.Errorf("failed to register: %v", err)
@@ -84,7 +84,7 @@ func TestStartClient3(t *testing.T) {
 			ServiceName:  "HelloService",
 			Host:         "127.0.0.1",
 			Port:         8092,
-			IntervalTime: time.Duration(10000),
+			IntervalTime: time.Duration(10),
 		})
 		if err != nil {
 			t.Errorf("failed to register: %v", err)

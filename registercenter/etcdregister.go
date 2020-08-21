@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"log"
 	"strings"
+	"time"
 )
 
 type etcdRegisterImpl struct {
@@ -23,38 +25,37 @@ func (etcd *etcdRegisterImpl) Register(info ServiceDescInfo) error {
 		log.Println("连接etcd失败:", err)
 		return err
 	}
-	// minimum lease TTL is ttl-second
-	resp, err := client.Grant(context.TODO(), int64(info.IntervalTime))
-	if err != nil {
-		log.Println("创建租约失败:", err)
-		return err
-	}
-	// should get first, if not exist, set it
-	kv, err := client.Get(context.Background(), info.ServiceName)
-	log.Printf("%v", kv)
-	serviceValue := fmt.Sprintf("%s:%d", info.Host, info.Port)
-	if err != nil {
-		log.Printf("etcd: service '%s' connect to etcd3 failed: %s", info.ServiceName, err.Error())
-		return err
-	}
-	if kv.Kvs == nil {
-		if _, err := client.Put(context.TODO(), info.ServiceName, serviceValue, clientv3.WithLease(resp.ID)); err != nil {
-			log.Printf("etcd: set service '%s' with ttl to etcd3 failed: %s", info.ServiceName, err.Error())
+	defer client.Close()
+
+	kv := clientv3.NewKV(client)
+	lease := clientv3.NewLease(client)
+	var curLeaseId clientv3.LeaseID = 0
+	for {
+		if curLeaseId == 0 {
+			leaseResp, err := lease.Grant(context.Background(), int64(info.IntervalTime))
+			if err != nil {
+				panic(err)
+			}
+			key := fmt.Sprintf("%s/%d", info.ServiceName, leaseResp.ID)
+			value := fmt.Sprintf("%s:%d", info.Host, info.Port)
+			if _, err := kv.Put(context.Background(), key, value, clientv3.WithLease(leaseResp.ID)); err != nil {
+				panic(err)
+			}
+			curLeaseId = leaseResp.ID
+		} else {
+			if _, err := lease.KeepAliveOnce(context.Background(), curLeaseId); err == rpctypes.ErrLeaseNotFound {
+				curLeaseId = 0
+				continue
+			}
 		}
-	} else {
-		// refresh set to true for not notifying the watcher
-		err := etcd.update(info.ServiceName, serviceValue, client, resp)
-		if err != nil {
-			return err
-		}
+		time.Sleep(time.Duration(5) * time.Second)
 	}
-	log.Println("register successful")
-	return nil
 }
 
 //etcd 实现下线接口
 func (etcd *etcdRegisterImpl) UnRegister(info ServiceDescInfo) error {
 	client, err := clientv3.NewFromURL(etcd.Address)
+	defer client.Close()
 	if err != nil {
 		return err
 	}
